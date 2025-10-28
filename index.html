@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Supabase Chat</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f2f2f2;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      background: #fff;
+      border-top: 1px solid #ccc;
+    }
+    .msg {
+      padding: 6px;
+      margin-bottom: 8px;
+      background: #e8f0fe;
+      border-radius: 8px;
+      word-wrap: break-word;
+    }
+    .msg b {
+      color: #333;
+    }
+    form {
+      display: flex;
+      gap: 6px;
+      padding: 10px;
+      background: #fff;
+      border-top: 1px solid #ccc;
+    }
+    input, button {
+      font-size: 1em;
+      padding: 6px;
+    }
+    input[type="text"] {
+      flex: 1;
+    }
+    audio {
+      margin-top: 5px;
+      width: 250px;
+    }
+  </style>
+</head>
+<body>
+  <div id="chat"></div>
+  <form id="form">
+    <input id="username" placeholder="Имя" required />
+    <input id="message" type="text" placeholder="Сообщение" />
+    <input id="file" type="file" />
+    <button>Отправить</button>
+  </form>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const SUPABASE_URL = "https://pxhwdlqfagkzzgbitqne.supabase.co";
+      const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4aHdkbHFmYWdrenpnYml0cW5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0MTUyMTEsImV4cCI6MjA2ODk5MTIxMX0.oIrgF_2MHYwyBSmwG9EmtxvIy45Jy_YVjUPflrMpx80";
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      const chatDiv = document.getElementById("chat");
+      const form = document.getElementById("form");
+      const usernameInput = document.getElementById("username");
+      const messageInput = document.getElementById("message");
+      const fileInput = document.getElementById("file");
+
+      // 🎤 Кнопка записи
+      const recordBtn = document.createElement("button");
+      recordBtn.textContent = "🎙️ Голос";
+      recordBtn.type = "button";
+      form.appendChild(recordBtn);
+
+      let mediaRecorder;
+      let audioChunks = [];
+      let recording = false;
+
+      async function loadMessages() {
+        const { data } = await supabaseClient
+          .from("messages")
+          .select("*")
+          .order("created_at", { ascending: true });
+        chatDiv.innerHTML = "";
+        data.forEach(addMessageToChat);
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+      }
+
+      function addMessageToChat(msg) {
+        const div = document.createElement("div");
+        div.className = "msg";
+        div.innerHTML = `<b>${msg.username}</b>: ${msg.content || ""}`;
+        if (msg.file_url) {
+          const url = msg.file_url;
+          if (url.match(/\.(mp3|wav|ogg|webm)$/)) {
+            div.innerHTML += `<br><audio controls src="${url}"></audio>`;
+          } else if (url.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+            div.innerHTML += `<br><img src="${url}" width="200"/>`;
+          } else {
+            div.innerHTML += `<br><a href="${url}" target="_blank">📎 Скачать файл</a>`;
+          }
+        }
+        chatDiv.appendChild(div);
+      }
+
+      async function uploadFile(file) {
+        const fileName = `${Date.now()}-${file.name}`;
+        const { error } = await supabaseClient.storage
+          .from("chat-files")
+          .upload(fileName, file);
+        if (error) {
+          alert("Ошибка при загрузке файла: " + error.message);
+          return null;
+        }
+        return `${SUPABASE_URL}/storage/v1/object/public/chat-files/${fileName}`;
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const username = usernameInput.value.trim() || "User";
+        const content = messageInput.value.trim();
+        const file = fileInput.files[0];
+        let fileUrl = null;
+
+        if (file) {
+          fileUrl = await uploadFile(file);
+          fileInput.value = "";
+        }
+
+// не отправляем, если пусто
+if (!content && !fileUrl) {
+  alert("Введите сообщение или прикрепите файл 🎤📎");
+  return;
+}
+
+await supabaseClient
+  .from("messages")
+  .insert([{ username, content, file_url: fileUrl }]);
+
+        messageInput.value = "";
+      });
+
+      // 🎙️ Голосовая запись
+      recordBtn.addEventListener("click", async () => {
+        if (!recording) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          audioChunks = [];
+
+          mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+            const file = new File([audioBlob], `voice-${Date.now()}.webm`, { type: "audio/webm" });
+            const fileUrl = await uploadFile(file);
+            const username = usernameInput.value.trim() || "User";
+            await supabaseClient.from("messages").insert([{ username, file_url: fileUrl }]);
+          };
+
+          mediaRecorder.start();
+          recording = true;
+          recordBtn.textContent = "⏹️ Стоп";
+        } else {
+          mediaRecorder.stop();
+          recording = false;
+          recordBtn.textContent = "🎙️ Голос";
+        }
+      });
+
+      // 🔁 Realtime
+      supabaseClient
+        .channel("realtime:messages")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+          addMessageToChat(payload.new);
+          chatDiv.scrollTop = chatDiv.scrollHeight;
+        })
+        .subscribe();
+
+      loadMessages();
+    });
+  </script>
+</body>
+</html>

@@ -1,188 +1,542 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Supabase Chat</title>
+  <title>Supabase Chat — modal fixed</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
+    :root {
+      --main-bg: #e3f2fd;
+      --header-bg: #bbdefb;
+      --footer-bg: #f0f8ff;
+      --accent: #3db85d;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html,
     body {
-      font-family: sans-serif;
-      background: #f2f2f2;
+      height: 100%;
       margin: 0;
+      font-family: Inter, "Segoe UI", sans-serif
+    }
+
+    body {
+      background: var(--main-bg) fixed center/cover no-repeat;
+      transition: background .25s ease, background-color .25s ease;
       display: flex;
       flex-direction: column;
-      height: 100vh;
+      min-height: 100vh;
     }
-    #chat {
+
+    header {
+      background: var(--header-bg);
+      padding: 12px;
+      text-align: center;
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      transition: background .25s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+
+    main#chat {
       flex: 1;
-      overflow-y: auto;
-      padding: 10px;
-      background: #fff;
-      border-top: 1px solid #ccc;
+      overflow: auto;
+      padding: 16px;
+      max-width: 1100px;
+      margin: 0 auto;
+      width: 100%;
+      padding-bottom: 140px
     }
+
     .msg {
-      padding: 6px;
-      margin-bottom: 8px;
-      background: #e8f0fe;
-      border-radius: 8px;
-      word-wrap: break-word;
-    }
-    .msg b {
-      color: #333;
-    }
-    form {
-      display: flex;
-      gap: 6px;
+      background: rgba(255, 255, 255, 0.95);
       padding: 10px;
-      background: #fff;
-      border-top: 1px solid #ccc;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      max-width: min(78%, 820px);
+      word-wrap: break-word;
+      white-space: pre-wrap;
+      box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06)
     }
-    input, button {
-      font-size: 1em;
-      padding: 6px;
+
+    .msg.self {
+      margin-left: auto;
+      background: var(--accent);
+      color: #000
     }
-    input[type="text"] {
+
+    .meta {
+      font-weight: 700;
+      margin-bottom: 6px
+    }
+
+    .bottom {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--footer-bg);
+      padding: 12px 0;
+      box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.06);
+      z-index: 45
+    }
+
+    .composer {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      gap: 8px;
+      align-items: end;
+      padding: 0 12px
+    }
+
+    textarea#messageInput {
       flex: 1;
+      min-height: 56px;
+      max-height: 40vh;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #e6e6e6;
+      resize: vertical;
+      font-size: 15px;
+      background: #fff
     }
-    audio {
-      margin-top: 5px;
-      width: 250px;
+
+    .iconBtn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      height: 44px;
+      min-width: 44px;
+      border-radius: 10px;
+      border: 1px solid #e6e6e6;
+      background: #fff;
+      cursor: pointer
+    }
+
+    .sendBtn {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: none;
+      background: var(--accent);
+      font-weight: 700;
+      cursor: pointer;
+      min-width: 92px
+    }
+
+    input[type="file"] {
+      display: none
+    }
+
+    #usernameModal {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 90;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity .15s
+    }
+
+    #usernameModal.open {
+      visibility: visible;
+      opacity: 1
+    }
+
+    .modalCard {
+      width: min(520px, 92%);
+      padding: 18px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #0f1113, #0b0c0d);
+      color: #fff;
+      text-align: center;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5)
+    }
+
+    .modalCard h2 {
+      margin: 0 0 8px
+    }
+
+    .modalCard p {
+      margin: 0 0 14px;
+      color: #cfcfcf
+    }
+
+    .modalCard input {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      background: rgba(255, 255, 255, 0.06);
+      color: #fff;
+      margin-bottom: 12px;
+      font-size: 15px
+    }
+
+    .modalCard button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      background: var(--accent);
+      color: #000;
+      font-weight: 700;
+      cursor: pointer
+    }
+
+    .notify {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 120px;
+      background: #ff6b6b;
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+      z-index: 95
+    }
+
+    .notify.show {
+      opacity: 1;
+      pointer-events: auto
+    }
+
+    @media(max-width:600px) {
+      .composer {
+        flex-direction: column;
+        align-items: stretch
+      }
+
+      textarea#messageInput {
+        min-height: 50px
+      }
+
+      .modalCard {
+        width: 92%
+      }
+
+      .msg {
+        max-width: 92%
+      }
     }
   </style>
 </head>
+
 <body>
-  <div id="chat"></div>
-  <form id="form">
-    <input id="username" placeholder="Имя" required />
-    <input id="message" type="text" placeholder="Сообщение" />
-    <input id="file" type="file" />
-    <button>Отправить</button>
-  </form>
+  <header id="header">Supabase Chat</header>
+
+  <main id="chat" aria-live="polite"></main>
+
+  <div class="bottom" role="region" aria-label="Панель отправки">
+    <form id="composerForm" class="composer" onsubmit="return false;">
+      <textarea id="messageInput" placeholder="Напишите сообщение (Enter — отправить, Shift+Enter — новая строка)"
+        disabled></textarea>
+
+      <label class="iconBtn" title="Прикрепить файл" for="fileInput">📎</label>
+      <input id="fileInput" type="file" accept="image/*,audio/*,video/*,.pdf" disabled>
+
+      <button id="recordBtn" type="button" class="iconBtn" title="Голосовое" disabled>🎤</button>
+
+      <button id="sendBtn" type="button" class="sendBtn" disabled>Отправить</button>
+    </form>
+  </div>
+
+  <div id="notify" class="notify" role="status" aria-live="assertive"></div>
+
+  <div id="usernameModal" aria-hidden="true">
+    <div class="modalCard" role="dialog" aria-modal="true" aria-label="Как к вам обращаться?">
+      <h2>Как к вам обращаться?</h2>
+      <p>Введите имя или ник — оно запомнится на этом устройстве.</p>
+      <input id="usernameInput" type="text" placeholder="Ваше имя или ник" autocomplete="off" />
+      <button id="usernameStart" type="button">Начать чат</button>
+    </div>
+  </div>
+
+  <div style="position:fixed; right:12px; top:12px; z-index:100; display:flex; gap:8px; align-items:center;">
+    <input id="bgColor" type="color" title="Выбрать цвет фона" value="#e3f2fd"
+      style="width:40px;height:40px;border-radius:8px;border:none;cursor:pointer" />
+    <label for="bgUpload"
+      style="cursor:pointer;padding:8px 10px;border-radius:8px;background:#fff;border:1px solid #e6e6e6">🖼️</label>
+    <input id="bgUpload" type="file" accept="image/*" style="display:none" />
+    <button id="changeNameBtn"
+      style="margin-left:6px;padding:8px 10px;border-radius:8px;border:1px solid #e6e6e6;background:#fff;cursor:pointer">👤</button>
+  </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener('DOMContentLoaded', () => {
       const SUPABASE_URL = "https://pxhwdlqfagkzzgbitqne.supabase.co";
       const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4aHdkbHFmYWdrenpnYml0cW5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM0MTUyMTEsImV4cCI6MjA2ODk5MTIxMX0.oIrgF_2MHYwyBSmwG9EmtxvIy45Jy_YVjUPflrMpx80";
-      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      const chatDiv = document.getElementById("chat");
-      const form = document.getElementById("form");
-      const usernameInput = document.getElementById("username");
-      const messageInput = document.getElementById("message");
-      const fileInput = document.getElementById("file");
+      const chatEl = document.getElementById('chat');
+      const usernameModal = document.getElementById('usernameModal');
+      const usernameInput = document.getElementById('usernameInput');
+      const usernameStart = document.getElementById('usernameStart');
+      const messageInput = document.getElementById('messageInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const fileInput = document.getElementById('fileInput');
+      const recordBtn = document.getElementById('recordBtn');
+      const notifyEl = document.getElementById('notify');
+      const bgColor = document.getElementById('bgColor');
+      const bgUpload = document.getElementById('bgUpload');
+      const changeNameBtn = document.getElementById('changeNameBtn');
+      const headerEl = document.getElementById('header');
+      const bottomEl = document.querySelector('.bottom');
 
-      // 🎤 Кнопка записи
-      const recordBtn = document.createElement("button");
-      recordBtn.textContent = "🎙️ Голос";
-      recordBtn.type = "button";
-      form.appendChild(recordBtn);
-
-      let mediaRecorder;
+      let username = localStorage.getItem('chat_username') || null;
+      let mediaRecorder = null;
       let audioChunks = [];
       let recording = false;
 
-      async function loadMessages() {
-        const { data } = await supabaseClient
-          .from("messages")
-          .select("*")
-          .order("created_at", { ascending: true });
-        chatDiv.innerHTML = "";
-        data.forEach(addMessageToChat);
-        chatDiv.scrollTop = chatDiv.scrollHeight;
+      function showNotify(text) {
+        notifyEl.textContent = text;
+        notifyEl.classList.add('show');
+        setTimeout(() => notifyEl.classList.remove('show'), 2200);
       }
 
-      function addMessageToChat(msg) {
-        const div = document.createElement("div");
-        div.className = "msg";
-        div.innerHTML = `<b>${msg.username}</b>: ${msg.content || ""}`;
-        if (msg.file_url) {
-          const url = msg.file_url;
-          if (url.match(/\.(mp3|wav|ogg|webm)$/)) {
-            div.innerHTML += `<br><audio controls src="${url}"></audio>`;
-          } else if (url.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
-            div.innerHTML += `<br><img src="${url}" width="200"/>`;
-          } else {
-            div.innerHTML += `<br><a href="${url}" target="_blank">📎 Скачать файл</a>`;
-          }
+      function setComposerDisabled(state) {
+        messageInput.disabled = state;
+        sendBtn.disabled = state;
+        fileInput.disabled = state;
+        recordBtn.disabled = state;
+      }
+
+      function openModal() {
+        usernameModal.classList.add('open');
+        usernameModal.style.visibility = 'visible';
+        usernameModal.style.opacity = '1';
+        usernameModal.setAttribute('aria-hidden', 'false');
+        usernameInput.value = '';
+        setComposerDisabled(true);
+        setTimeout(() => usernameInput.focus(), 80);
+      }
+      function closeModal() {
+        usernameModal.classList.remove('open');
+        usernameModal.style.visibility = 'hidden';
+        usernameModal.style.opacity = '0';
+        usernameModal.setAttribute('aria-hidden', 'true');
+        setComposerDisabled(false);
+      }
+
+      async function startAfterName() {
+        const v = usernameInput.value.trim();
+        if (!v) {
+          showNotify('Введите имя или ник');
+          usernameInput.focus();
+          return;
         }
-        chatDiv.appendChild(div);
+        username = v;
+        localStorage.setItem('chat_username', username);
+        closeModal();
+        await initChat();
+      }
+
+      usernameStart.addEventListener('click', startAfterName);
+      usernameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); startAfterName(); } });
+
+      changeNameBtn.addEventListener('click', () => {
+        usernameInput.value = username || '';
+        openModal();
+      });
+
+      if (!username || username.trim() === '') {
+        openModal();
+      } else {
+        setComposerDisabled(false);
+        initChat();
+      }
+
+      const savedColor = localStorage.getItem('chat_bg_color');
+      const savedImg = localStorage.getItem('chat_bg_image');
+      if (savedImg) {
+        applyBackgroundImage(savedImg);
+      } else if (savedColor) {
+        applyColor(savedColor);
+        bgColor.value = savedColor;
+      } else {
+      }
+
+      bgColor.addEventListener('input', (e) => {
+        const c = e.target.value;
+        localStorage.setItem('chat_bg_color', c);
+        localStorage.removeItem('chat_bg_image');
+        applyColor(c);
+      });
+
+      bgUpload.addEventListener('change', (ev) => {
+        const f = ev.target.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const data = e.target.result;
+          localStorage.setItem('chat_bg_image', data);
+          localStorage.removeItem('chat_bg_color');
+          applyBackgroundImage(data);
+        };
+        reader.readAsDataURL(f);
+      });
+
+      function applyBackgroundImage(dataUrl) {
+        document.body.style.backgroundImage = `url(${dataUrl})`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundRepeat = 'no-repeat';
+        document.body.style.backgroundAttachment = 'fixed';
+        headerEl.style.background = shadeColorFromImage(dataUrl, -12) || 'rgba(255,255,255,0.9)';
+        bottomEl.style.background = 'rgba(255,255,255,0.92)';
+      }
+
+      function applyColor(hex) {
+        document.body.style.backgroundImage = '';
+        document.body.style.background = hex;
+        document.body.style.backgroundAttachment = 'fixed';
+        headerEl.style.background = adjustColor(hex, -12);
+        bottomEl.style.background = adjustColor(hex, +12);
+      }
+
+      function shadeColorFromImage(_dataUrl, _percent) {
+        return 'rgba(255,255,255,0.92)';
+      }
+
+      function adjustColor(hex, percent) {
+        try {
+          const num = parseInt(hex.slice(1), 16);
+          let r = (num >> 16) + percent;
+          let g = ((num >> 8) & 0xFF) + percent;
+          let b = (num & 0xFF) + percent;
+          r = Math.max(0, Math.min(255, r));
+          g = Math.max(0, Math.min(255, g));
+          b = Math.max(0, Math.min(255, b));
+          return `rgb(${r}, ${g}, ${b})`;
+        } catch (e) {
+          return hex;
+        }
+      }
+
+      async function initChat() {
+        await loadMessages();
+        supabase.channel('realtime:messages')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+            renderMessage(payload.new);
+          })
+          .subscribe();
+      }
+
+      async function loadMessages() {
+        try {
+          const { data } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
+          chatEl.innerHTML = '';
+          if (data && data.length) data.forEach(renderMessage);
+          chatEl.scrollTop = chatEl.scrollHeight;
+        } catch (err) {
+          console.error(err);
+          showNotify('Ошибка загрузки сообщений');
+        }
+      }
+
+      function renderMessage(m) {
+        const el = document.createElement('div');
+        el.className = 'msg' + ((m.username === username) ? ' self' : '');
+        let html = `<div class="meta">${escapeHtml(m.username)}</div>`;
+        if (m.content) html += `<div>${escapeHtml(m.content)}</div>`;
+        if (m.file_url) {
+          const u = m.file_url;
+          if (/\.(jpe?g|png|gif|webp)$/i.test(u)) html += `<div style="margin-top:8px"><img src="${u}" style="max-width:360px;border-radius:8px"></div>`;
+          else if (/\.(mp4|webm)$/i.test(u)) html += `<div style="margin-top:8px"><video controls src="${u}" style="max-width:360px;border-radius:8px"></video></div>`;
+          else if (/\.(mp3|wav|ogg|webm)$/i.test(u)) html += `<div style="margin-top:8px"><audio controls src="${u}"></audio></div>`;
+          else html += `<div style="margin-top:8px"><a href="${u}" target="_blank">📎 Скачать</a></div>`;
+        }
+        el.innerHTML = html;
+        chatEl.appendChild(el);
+        chatEl.scrollTop = chatEl.scrollHeight;
       }
 
       async function uploadFile(file) {
-        const fileName = `${Date.now()}-${file.name}`;
-        const { error } = await supabaseClient.storage
-          .from("chat-files")
-          .upload(fileName, file);
-        if (error) {
-          alert("Ошибка при загрузке файла: " + error.message);
-          return null;
-        }
-        return `${SUPABASE_URL}/storage/v1/object/public/chat-files/${fileName}`;
+        if (!file) return null;
+        const safe = file.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
+        const key = `${Date.now()}-${safe}`;
+        try {
+          const { error } = await supabase.storage.from('chat-files').upload(key, file);
+          if (error) { console.error(error); showNotify('Ошибка загрузки'); return null; }
+          const { data } = supabase.storage.from('chat-files').getPublicUrl(key);
+          return data.publicUrl;
+        } catch (e) { console.error(e); showNotify('Ошибка загрузки'); return null; }
       }
 
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const username = usernameInput.value.trim() || "User";
-        const content = messageInput.value.trim();
+      sendBtn.addEventListener('click', async () => {
+        if (!username) { openModal(); return; }
+        const text = messageInput.value.trim();
         const file = fileInput.files[0];
-        let fileUrl = null;
-
-        if (file) {
-          fileUrl = await uploadFile(file);
-          fileInput.value = "";
-        }
-
-// не отправляем, если пусто
-if (!content && !fileUrl) {
-  alert("Введите сообщение или прикрепите файл 🎤📎");
-  return;
-}
-
-await supabaseClient
-  .from("messages")
-  .insert([{ username, content, file_url: fileUrl }]);
-
-        messageInput.value = "";
+        let url = null;
+        if (file) url = await uploadFile(file);
+        if (!text && !url) { showNotify('Нельзя отправить пустое сообщение'); return; }
+        try {
+          await supabase.from('messages').insert([{ username, content: text || null, file_url: url }]);
+          messageInput.value = '';
+          fileInput.value = '';
+        } catch (e) { console.error(e); showNotify('Ошибка отправки'); }
       });
 
-      // 🎙️ Голосовая запись
-      recordBtn.addEventListener("click", async () => {
+      messageInput.addEventListener('keydown', async (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendBtn.click();
+        }
+      });
+
+      recordBtn.addEventListener('click', async () => {
+        if (!username) { openModal(); return; }
         if (!recording) {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          mediaRecorder = new MediaRecorder(stream);
-          audioChunks = [];
-
-          mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-          mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
-            const file = new File([audioBlob], `voice-${Date.now()}.webm`, { type: "audio/webm" });
-            const fileUrl = await uploadFile(file);
-            const username = usernameInput.value.trim() || "User";
-            await supabaseClient.from("messages").insert([{ username, file_url: fileUrl }]);
-          };
-
-          mediaRecorder.start();
-          recording = true;
-          recordBtn.textContent = "⏹️ Стоп";
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            mediaRecorder.ondataavailable = ev => audioChunks.push(ev.data);
+            mediaRecorder.onstop = async () => {
+              const blob = new Blob(audioChunks, { type: 'audio/webm' });
+              const file = new File([blob], `voice-${Date.now()}.webm`, { type: 'audio/webm' });
+              const url = await uploadFile(file);
+              if (url) await supabase.from('messages').insert([{ username, content: null, file_url: url }]);
+            };
+            mediaRecorder.start();
+            recording = true;
+            recordBtn.textContent = '⏹️';
+            showNotify('Запись началась');
+          } catch (err) { console.error(err); showNotify('Нет доступа к микрофону'); }
         } else {
           mediaRecorder.stop();
           recording = false;
-          recordBtn.textContent = "🎙️ Голос";
+          recordBtn.textContent = '🎤';
+          showNotify('Запись остановлена');
         }
       });
 
-      // 🔁 Realtime
-      supabaseClient
-        .channel("realtime:messages")
-        .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-          addMessageToChat(payload.new);
-          chatDiv.scrollTop = chatDiv.scrollHeight;
-        })
-        .subscribe();
+      function escapeHtml(s) { if (!s) return ''; return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
 
-      loadMessages();
+      if (!username || username.trim() === '') {
+        setComposerDisabled(true);
+      } else {
+        setComposerDisabled(false);
+        initChat();
+      }
+
     });
   </script>
 </body>
+
 </html>
